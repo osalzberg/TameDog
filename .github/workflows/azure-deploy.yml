@@ -1,0 +1,51 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        
+    - name: Install backend dependencies
+      run: npm install
+      
+    - name: Install client dependencies
+      run: cd client && npm install
+      
+    - name: Build React app
+      run: cd client && npm run build
+      
+    - name: Create deployment package
+      run: |
+        mkdir deploy
+        cp -r server deploy/
+        cp -r client/build deploy/client/
+        cp package.json deploy/
+        cp package-lock.json deploy/
+        cd deploy && zip -r ../deploy.zip .
+        
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Deploy to Azure Web App
+      run: |
+        az webapp deploy \
+          --resource-group OrensResourceGroup \
+          --name tamedog-booking-system \
+          --src-path deploy.zip \
+          --type zip \
+          --async true
